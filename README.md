@@ -12,7 +12,7 @@ SecureUDIDs have the following attributes:
 3. End-users can globally opt-out of SecureUDID collection across all applications and services that use it.
 
 ####How do I use it?
- 
+
     #import "SecureUDID.h"
 
     NSString *domain = @"com.example.myapp"
@@ -37,3 +37,14 @@ We chose to initially implement SecureUDID on iOS, but the concepts can be appli
 
 #####How can I get involved?
 Fork the crashlytics/secureudid project on GitHub, file issues, implement fixes, and submit pull requests!
+
+#####Version History
+
+March 27, 2012
+
+- Per-Owner dictionary implementation to support Opt-Out functionality
+- Addressed an issue that could result in pasteboard overwriting
+
+March 26, 2012
+
+- First public release
