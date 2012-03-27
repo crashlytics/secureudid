@@ -34,12 +34,12 @@
 
 /*
  Returns a unique id for the device, sandboxed to the domain and salt provided.
-
+ 
  Example usage:
  #import "SecureUDID.h"
-
+ 
  NSString *udid = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
-
+ 
  */
 + (NSString *)UDIDForDomain:(NSString *)domain salt:(NSString *)salt;
 

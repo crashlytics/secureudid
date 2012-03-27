@@ -41,19 +41,19 @@
  Tests the output from the UDIDForDomain:salt: method.
  */
 - (void)testUDIDForDomain {
-	// Confirm we get a UDID back.
-	NSString *udid = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
-	STAssertNotNil(udid, @"udid should not be nil");
-	
-	// Confirm we get the same UDID back.
-	NSString *sameUDID = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
-	STAssertNotNil(sameUDID, @"sameUDID should not be nil");
-	STAssertEqualObjects(udid, sameUDID, @"udid and sameUDID should be equal");
-	
-	// Confirm we get a different UDID since we are using a different domain.
-	NSString *newUDID = [SecureUDID UDIDForDomain:@"com.example.myapp.udid" salt:@"superSecretCodeHere!@##%#$#%$^"];
-	STAssertNotNil(newUDID, @"newUDID should not be nil");
-	STAssertFalse([newUDID isEqualToString:udid], @"newUDID and udid should not be equal");
+    // Confirm we get a UDID back.
+    NSString *udid = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
+    STAssertNotNil(udid, @"udid should not be nil");
+    
+    // Confirm we get the same UDID back.
+    NSString *sameUDID = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
+    STAssertNotNil(sameUDID, @"sameUDID should not be nil");
+    STAssertEqualObjects(udid, sameUDID, @"udid and sameUDID should be equal");
+    
+    // Confirm we get a different UDID since we are using a different domain.
+    NSString *newUDID = [SecureUDID UDIDForDomain:@"com.example.myapp.udid" salt:@"superSecretCodeHere!@##%#$#%$^"];
+    STAssertNotNil(newUDID, @"newUDID should not be nil");
+    STAssertFalse([newUDID isEqualToString:udid], @"newUDID and udid should not be equal");
 }
 
 @end
