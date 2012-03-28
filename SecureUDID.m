@@ -31,14 +31,18 @@
 #import "SecureUDID.h"
 #import <UIKit/UIKit.h>
 #import <CommonCrypto/CommonCryptor.h>
-#import <CommonCrypto/CommonKeyDerivation.h>
 #import <CommonCrypto/CommonDigest.h>
 
 #define SECURE_UDID_MAX_PASTEBOARD_ENTRIES (100)
 
+NSString *const SUUIDDefaultIdentifier   = @"00000000-0000-0000-0000-000000000000";
+
 NSString *const SUUIDTypeDataDictionary  = @"public.secureudid";
 NSString *const SUUIDTimeStampKey        = @"SUUIDTimeStampKey";
 NSString *const SUUIDOwnerKey            = @"SUUIDOwnerKey";
+NSString *const SUUIDLastAccessedKey     = @"SUUIDLastAccessedKey";
+NSString *const SUUIDIdentifierKey       = @"SUUIDIdentifierKey";
+NSString *const SUUIDOptOutKey           = @"SUUIDOptOutKey";
 NSString *const SUUIDPastboardFileFormat = @"org.secureudid-%d";
 
 NSData *cryptorToData(CCOperation operation, NSData *value, NSData *key);
@@ -69,42 +73,61 @@ UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain);
     // Encrypt the salted domain key and load the pasteboard on which to store data
     NSData *encryptedDomain = cryptorToData(kCCEncrypt, [domain dataUsingEncoding:NSUTF8StringEncoding], key);
     UIPasteboard *pasteboard = pasteboardForEncryptedDomain(encryptedDomain);
-    
+    if (!pasteboard) {
+        removeAllSecureUDIDData();
+        return SUUIDDefaultIdentifier;
+    }
+
     // Read the storage dictionary out of the pasteboard data, or create a new one
-    NSMutableDictionary *secureUDIDDictionary = nil;
+    NSMutableDictionary *topLevelDictionary = nil;
     id pasteboardData = [pasteboard dataForPasteboardType:SUUIDTypeDataDictionary];
     if (pasteboardData) {
         pasteboardData = [NSKeyedUnarchiver unarchiveObjectWithData:pasteboardData];
-        secureUDIDDictionary = [NSMutableDictionary dictionaryWithDictionary:pasteboardData];
+
+        // check for the opt-out flag and return the default identifier if we find it
+        if ([[pasteboardData objectForKey:SUUIDOptOutKey] boolValue] == YES) {
+            removeAllSecureUDIDData();
+            return SUUIDDefaultIdentifier;
+        }
+
+        topLevelDictionary = [NSMutableDictionary dictionaryWithDictionary:pasteboardData];
     } else {
-        secureUDIDDictionary = [NSMutableDictionary dictionaryWithCapacity:1];
+        topLevelDictionary = [NSMutableDictionary dictionary];
+    }
+
+    // Attempt to get the owner's dictionary.  Should we get back nil from the encryptedDomain key, we'll still
+    // get a valid, empty mutable dictionary
+    NSMutableDictionary *ownerDictionary = [NSMutableDictionary dictionaryWithDictionary:[topLevelDictionary objectForKey:encryptedDomain]];
+    [topLevelDictionary setObject:ownerDictionary forKey:encryptedDomain];
+
+    // set our last access time and claim ownership for this 
+    NSDate* lastAccessDate = [NSDate date];
+    [ownerDictionary    setObject:lastAccessDate  forKey:SUUIDLastAccessedKey];
+    [topLevelDictionary setObject:lastAccessDate  forKey:SUUIDTimeStampKey];
+    [topLevelDictionary setObject:encryptedDomain forKey:SUUIDOwnerKey];
+    
+    NSString *identifier     = nil;
+    NSData   *identifierData = [ownerDictionary objectForKey:SUUIDIdentifierKey];
+    if (identifierData) {
+        identifier = cryptorToString(kCCDecrypt, identifierData, key);
+    } else {
+        // Otherwise, create a new RFC-4122 Version 4 UUID
+        // http://en.wikipedia.org/wiki/Universally_unique_identifier
+        CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
+        identifier = [(NSString*)CFUUIDCreateString(kCFAllocatorDefault, uuid) autorelease];
+        CFRelease(uuid);
+        
+        // Encrypt it for storage.
+        NSData *data = cryptorToData(kCCEncrypt, [identifier dataUsingEncoding:NSUTF8StringEncoding], key);
+        
+        [ownerDictionary setObject:data forKey:SUUIDIdentifierKey];
     }
     
-    // If a UUID has already been generated for this salted domain, read it now
-    NSData *valueFromPasteboard = [secureUDIDDictionary objectForKey:encryptedDomain];
-    if (valueFromPasteboard) {
-        return cryptorToString(kCCDecrypt, valueFromPasteboard, key);
-    }
-    
-    // Otherwise, create a new RFC-4122 Version 4 UUID
-    // http://en.wikipedia.org/wiki/Universally_unique_identifier
-    CFUUIDRef uuid = CFUUIDCreate(kCFAllocatorDefault);
-    CFStringRef uuidStr = CFUUIDCreateString(kCFAllocatorDefault, uuid);
-    CFRelease(uuid);
-    
-    // Encrypt it for storage.
-    NSData *data = cryptorToData(kCCEncrypt, [(NSString *)uuidStr dataUsingEncoding:NSUTF8StringEncoding], key);
-    
-    // And store it in the pasteboard for later, along with the owner of this pasteboard
-    // And a timestamp noting its updated date.
-    [secureUDIDDictionary setObject:data            forKey:encryptedDomain];
-    [secureUDIDDictionary setObject:[NSDate date]   forKey:SUUIDTimeStampKey];
-    [secureUDIDDictionary setObject:encryptedDomain forKey:SUUIDOwnerKey];
-    
-    [pasteboard setData:[NSKeyedArchiver archivedDataWithRootObject:secureUDIDDictionary]
+    // always write out the pasteboard, to record our updates
+    [pasteboard setData:[NSKeyedArchiver archivedDataWithRootObject:topLevelDictionary]
       forPasteboardType:SUUIDTypeDataDictionary];
     
-    return [(NSString *)uuidStr autorelease];
+    return identifier;
 }
 
 /*
@@ -142,6 +165,23 @@ NSString *cryptorToString(CCOperation operation, NSData *value, NSData *key) {
     return [[[NSString alloc] initWithData:cryptorToData(operation, value, key) encoding:NSUTF8StringEncoding] autorelease];
 }
 
+void removeAllSecureUDIDData(void) {
+    NSDictionary* optoutPlaceholder;
+    NSData*       optoutData;
+    
+    optoutPlaceholder = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:SUUIDOptOutKey];
+    optoutData        = [NSKeyedArchiver archivedDataWithRootObject:optoutPlaceholder];
+    
+    for (NSInteger i = 0; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+        UIPasteboard* pasteboard;
+        
+        pasteboard = [UIPasteboard pasteboardWithName:pasteboardNameForNumber(i) create:NO];
+        if (pasteboard) {
+            [pasteboard setData:optoutData forPasteboardType:SUUIDTypeDataDictionary];
+        }
+    }
+}
+
 /*
  Returns an NSString formatted with the supplied number.
  */
@@ -165,7 +205,6 @@ NSString *pasteboardNameForNumber(NSInteger number) {
 UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain) {
     UIPasteboard*        usablePasteboard;
     NSInteger            lowestUnusedIndex;
-    NSInteger            ownerIndex;
     NSDate*              mostRecentDate;
     NSMutableDictionary* mostRecentDictionary;
     
@@ -173,7 +212,6 @@ UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain) {
     lowestUnusedIndex    = INTMAX_MAX;
     mostRecentDate       = [NSDate distantPast];
     mostRecentDictionary = nil;
-    ownerIndex           = -1;
     
     // The array of SecureUDID pasteboards can be sparse, since any number of
     // apps may have been deleted. To find a pasteboard owned by the the current
@@ -209,23 +247,26 @@ UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain) {
         dictionary   = [NSKeyedUnarchiver unarchiveObjectWithData:pasteboardData];
         modifiedDate = [dictionary valueForKey:SUUIDTimeStampKey];
         
+        if ([[dictionary objectForKey:SUUIDOptOutKey] boolValue] == YES) {
+            return nil;
+        }
+        
         // Hold a copy of the data if this is the newest we've found so far.
         if ([modifiedDate compare:mostRecentDate] == NSOrderedDescending) {
             mostRecentDate       = modifiedDate;
             mostRecentDictionary = [NSMutableDictionary dictionaryWithDictionary:dictionary];
-            usablePasteboard     = pasteboard;
         }
         
         // Finally, notate if this is the pasteboard owned by the requesting domain.
         if ([[dictionary objectForKey:SUUIDOwnerKey] isEqual:encryptedDomain]) {
-            ownerIndex = i;
+            usablePasteboard = pasteboard;
         }
     }
     
     // If no pasteboard is owned by this domain, establish a new one to increase the
     // likelihood of permanence.
-    if (ownerIndex == -1) {
-        // Unless there are no available slots
+    if (!usablePasteboard) {
+        // Unless there are no available slots, pick one
         if ((lowestUnusedIndex < 0) || (lowestUnusedIndex >= SECURE_UDID_MAX_PASTEBOARD_ENTRIES)) {
             return nil;
         }
@@ -235,19 +276,14 @@ UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain) {
             mostRecentDictionary = [NSMutableDictionary dictionary];
         }
         
-        // Set ownership and the created timestamp.
-        [mostRecentDictionary setObject:encryptedDomain forKey:SUUIDOwnerKey];
-        [mostRecentDictionary setObject:[NSDate date]   forKey:SUUIDTimeStampKey];
-        
         // Create and save the pasteboard.
         usablePasteboard = [UIPasteboard pasteboardWithName:pasteboardNameForNumber(lowestUnusedIndex) create:YES];
         usablePasteboard.persistent = YES;
-        
-        [usablePasteboard setData:[NSKeyedArchiver archivedDataWithRootObject:mostRecentDictionary]
-                forPasteboardType:SUUIDTypeDataDictionary];
     }
     
-    assert(usablePasteboard);
+    // Write it back to the pasteboard, so the next steps will merge data.
+    [usablePasteboard setData:[NSKeyedArchiver archivedDataWithRootObject:mostRecentDictionary]
+            forPasteboardType:SUUIDTypeDataDictionary];
     
     return usablePasteboard;
 }
