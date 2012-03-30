@@ -33,14 +33,43 @@
 @interface SecureUDID : NSObject
 
 /*
- Returns a unique id for the device, sandboxed to the domain and salt provided.
+ Returns a unique id for the device, sandboxed to the domain and salt provided.  This is a potentially
+ expensive call.  You should not do this on the main thread, especially during launch.
+ 
+ retrieveUDIDForDomain:usingKey:completion: is provided as an alternative for your 4.0+ coding convenience.
  
  Example usage:
  #import "SecureUDID.h"
  
- NSString *udid = [SecureUDID UDIDForDomain:@"com.example.myapp" salt:@"superSecretCodeHere!@##%#$#%$^"];
+ NSString *udid = [SecureUDID UDIDForDomain:@"com.example.myapp" key:@"difficult-to-guess-key"];
  
  */
-+ (NSString *)UDIDForDomain:(NSString *)domain salt:(NSString *)salt;
++ (NSString *)UDIDForDomain:(NSString *)domain usingKey:(NSString *)key;
+
+/*
+ Getting a SecureUDID can be very expensive.  Use this call to derive an identifier in the background,
+ and invoke a block when ready.  Use of this method implies a device running >= iOS 4.0.
+ 
+ Example usage:
+ #import "SecureUDID.h"
+ 
+ [SecureUDID retrieveUDIDForDomain:@"com.example.myapp" usingKey:@"difficult-to-guess-key" completion:^(NSString *identifier) {
+    // make use of identifier here
+ }];
+ 
+ */
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_4_0
++ (void)retrieveUDIDForDomain:(NSString *)domain usingKey:(NSString *)key completion:(void (^)(NSString* identifier))completion;
+#endif
+
+/*
+ Indicates that the system has been disabled via the Opt-Out mechansim.
+*/
++ (BOOL)isOptedOut;
 
 @end
+
+/*
+ This identifier is returned when Opt-Out is enabled.
+ */
+extern NSString *const SUUIDDefaultIdentifier;
