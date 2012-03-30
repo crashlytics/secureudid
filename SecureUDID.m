@@ -209,7 +209,7 @@ UIPasteboard *pasteboardForEncryptedDomain(NSData *encryptedDomain) {
     NSMutableDictionary* mostRecentDictionary;
     
     usablePasteboard     = nil;
-    lowestUnusedIndex    = INTMAX_MAX;
+    lowestUnusedIndex    = -1;
     mostRecentDate       = [NSDate distantPast];
     mostRecentDictionary = nil;
     
