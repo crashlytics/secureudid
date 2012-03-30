@@ -137,7 +137,7 @@ BOOL          SUUIDValidOwnerObject(id object);
         [topLevelDictionary setObject:ownerDictionary forKey:encryptedOwnerKey];
         
         
-        NSData   *identifierData = [ownerDictionary objectForKey:SUUIDIdentifierKey];
+        NSData *identifierData = [ownerDictionary objectForKey:SUUIDIdentifierKey];
         if (identifierData) {
             identifier = SUUIDCryptorToString(kCCDecrypt, identifierData, ownerKey);
             if (!identifier) {
@@ -145,7 +145,7 @@ BOOL          SUUIDValidOwnerObject(id object);
                 SUUIDDeleteStorageLocation(ownerIndex);
                 
                 // return here - do not write values back to the store
-                return identifier;
+                return SUUIDDefaultIdentifier;
             }
         } else {
             // Otherwise, create a new RFC-4122 Version 4 UUID

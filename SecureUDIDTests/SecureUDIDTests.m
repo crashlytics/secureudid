@@ -35,10 +35,11 @@
 
 // Stuff we need from SecureUDID.m
 #define SUUID_SCHEMA_VERSION        (1)
-#define SECURE_UDID_MAX_PASTEBOARD_ENTRIES (64)
+#define SUUID_MAX_STORAGE_LOCATIONS (64)
 
 extern NSString *const SUUIDTypeDataDictionary;
 extern NSString *const SUUIDOwnerKey;
+extern NSString *const SUUIDIdentifierKey;
 extern NSString *const SUUIDTimeStampKey;
 extern NSString *const SUUIDModelHashKey;
 extern NSString *const SUUIDSchemaVersionKey;
@@ -63,7 +64,7 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
 - (void)setUp {
     
     // clear out any previous pasteboards
-    for (NSInteger i = 0; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
         SUUIDDeleteStorageLocation(i);
     }
 }
@@ -110,7 +111,7 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
     STAssertNotNil(dictionary, @"The first location should have a valid dictionary");
     STAssertNotNil([dictionary objectForKey:[dictionary objectForKey:SUUIDOwnerKey]], @"The owner should have an owner dictionary");
     
-    for (NSInteger i = 1; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+    for (NSInteger i = 1; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
         dictionary = SUUIDDictionaryForStorageLocation(i);
         
         STAssertNil(dictionary, @"All other locations should be nil");
@@ -171,22 +172,22 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
     // This takes a long time to execute.  The storage algorithm is inefficient, so calling it
     // many times in a row isn't great.  The typical case, where an application generates one (or just a few)
     // identifiers is much better.
-    for (NSInteger i = 0; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
         [SecureUDID UDIDForDomain:[NSString stringWithFormat:@"com.example.myapp-%d", i] usingKey:@"example key"];
     }
     
     // that should be the max
     firstDictionary = SUUIDDictionaryForStorageLocation(0);
-    dictionary      = SUUIDDictionaryForStorageLocation(SECURE_UDID_MAX_PASTEBOARD_ENTRIES-1);
+    dictionary      = SUUIDDictionaryForStorageLocation(SUUID_MAX_STORAGE_LOCATIONS-1);
     STAssertNotNil(dictionary, @"The last storage location should have an entry");
     
     // add the plus one
-    [SecureUDID UDIDForDomain:@"com.example.myapp-100" usingKey:@"example key"];
+    [SecureUDID UDIDForDomain:@"com.example.myapp-last-plus-one" usingKey:@"example key"];
     
     // this should overwrite the firstDictionary location
     dictionary = SUUIDDictionaryForStorageLocation(0);
     STAssertFalse([[dictionary objectForKey:SUUIDOwnerKey] isEqual:[firstDictionary objectForKey:SUUIDOwnerKey]], @"Owners should not be equal");
-    STAssertEquals(SECURE_UDID_MAX_PASTEBOARD_ENTRIES + 1 + 4, (int)[dictionary count], @"All owners, plus four meta-data entries, should be present");
+    STAssertEquals(SUUID_MAX_STORAGE_LOCATIONS + 1 + 4, (int)[dictionary count], @"All owners, plus four meta-data entries, should be present");
 }
 
 - (void)testCorruptionViaMissingTimestamp {
@@ -215,6 +216,28 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
     [self writeUnverifiedData:dictionary toStorageLocation:0];
     
     STAssertNil(SUUIDDictionaryForStorageLocation(0), @"Location should be removed");
+}
+
+- (void)testCorruptionViaDecryptionFailureOfIndentifier {
+    NSString*            identifier;
+    NSMutableDictionary* dictionary;
+    NSMutableDictionary* ownerDictionary;
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    STAssertFalse([identifier isEqualToString:SUUIDDefaultIdentifier], @"Id should not be the default");
+    
+    dictionary      = [NSMutableDictionary dictionaryWithDictionary:SUUIDDictionaryForStorageLocation(0)];
+    ownerDictionary = [NSMutableDictionary dictionaryWithDictionary:[dictionary objectForKey:[dictionary objectForKey:SUUIDOwnerKey]]];
+    
+    [ownerDictionary setObject:[NSData data]   forKey:SUUIDIdentifierKey]; // set a bogus identifier
+    [dictionary      setObject:ownerDictionary forKey:[dictionary objectForKey:SUUIDOwnerKey]];
+    
+    [self writeUnverifiedData:dictionary toStorageLocation:0];
+    
+    // after all that, get the id back so we can check it
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    STAssertEqualObjects(SUUIDDefaultIdentifier, identifier, @"The default id should come back on decryption failure");
+    STAssertNil(SUUIDDictionaryForStorageLocation(0), @"... and the storage location should get blown away");
 }
 
 - (void)testNewUDIDGeneratedWithModelHashMismatch {
@@ -273,29 +296,32 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
 }
 
 - (void)testOptOutPreservesOwners {
-    NSData* owner1;
-    NSData* owner2;
+    NSData* owner1Before;
+    NSData* owner1After;
+    NSData* owner2Before;
+    NSData* owner2After;
     
     [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
     [SecureUDID UDIDForDomain:@"com.example.myapp-2" usingKey:@"example key 2"];
     
-    owner1 = [SUUIDDictionaryForStorageLocation(0) objectForKey:SUUIDOwnerKey];
-    owner2 = [SUUIDDictionaryForStorageLocation(1) objectForKey:SUUIDOwnerKey];
+    owner1Before = [SUUIDDictionaryForStorageLocation(0) objectForKey:SUUIDOwnerKey];
+    owner2Before = [SUUIDDictionaryForStorageLocation(1) objectForKey:SUUIDOwnerKey];
     
-    STAssertFalse([owner1 isEqualToData:owner2], @"Owners should be distinct");
+    STAssertFalse([owner1Before isEqualToData:owner2Before], @"Owners should be distinct");
     
     SUUIDMarkOptedOut();
     
-    owner1 = [SUUIDDictionaryForStorageLocation(0) objectForKey:SUUIDOwnerKey];
-    owner2 = [SUUIDDictionaryForStorageLocation(1) objectForKey:SUUIDOwnerKey];
+    owner1After = [SUUIDDictionaryForStorageLocation(0) objectForKey:SUUIDOwnerKey];
+    owner2After = [SUUIDDictionaryForStorageLocation(1) objectForKey:SUUIDOwnerKey];
     
-    STAssertFalse([owner1 isEqualToData:owner2], @"Owners should still be distinct");
+    STAssertEqualObjects(owner1Before, owner1After, @"Onwer 1 should be the same");
+    STAssertEqualObjects(owner2Before, owner2After, @"Onwer 1 should be the same");
 }
 
 - (void)testOptInWithNoData {
     SUUIDMarkOptedIn();
     
-    for (NSInteger i = 0; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
         STAssertNil(SUUIDDictionaryForStorageLocation(i), @"No data should be present if you opt-in without any ids established");
     }
     
@@ -305,7 +331,7 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
 - (void)testOptOutWithNoData {
     SUUIDMarkOptedOut();
     
-    for (NSInteger i = 0; i < SECURE_UDID_MAX_PASTEBOARD_ENTRIES; ++i) {
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
         STAssertNotNil(SUUIDDictionaryForStorageLocation(i), @"No data should be present if you opt-in without any ids established");
     }
     
