@@ -535,6 +535,7 @@ NSInteger SUUIDStorageLocationForOwnerKey(NSData *ownerKey, NSMutableDictionary*
     NSDate*       mostRecentDate;
     NSDate*       oldestUsedDate;
     NSDictionary* mostRecentDictionary;
+    BOOL          optedOut;
     
     ownerIndex           = -1;
     lowestUnusedIndex    = -1;
@@ -542,6 +543,7 @@ NSInteger SUUIDStorageLocationForOwnerKey(NSData *ownerKey, NSMutableDictionary*
     mostRecentDate       = [NSDate distantPast];
     oldestUsedDate       = [NSDate distantFuture];
     mostRecentDictionary = nil;
+    optedOut             = NO;
     
     // The array of SecureUDID pasteboards can be sparse, since any number of
     // apps may have been deleted. To find a pasteboard owned by the the current
@@ -561,6 +563,7 @@ NSInteger SUUIDStorageLocationForOwnerKey(NSData *ownerKey, NSMutableDictionary*
         
         // Check the 'modified' timestamp of this pasteboard
         modifiedDate = [dictionary valueForKey:SUUIDTimeStampKey];
+        optedOut     = optedOut || [[dictionary valueForKey:SUUIDOptOutKey] boolValue];
         
         // Hold a copy of the data if this is the newest we've found so far.
         if ([modifiedDate compare:mostRecentDate] == NSOrderedDescending) {
@@ -591,16 +594,16 @@ NSInteger SUUIDStorageLocationForOwnerKey(NSData *ownerKey, NSMutableDictionary*
         }
     }
     
-    // Make sure to write the most recent structure to the new location, if we found one.  This is
-    // necessary so the following lookup gets the most recent data for a merge
-    if (mostRecentDictionary) {
-        SUUIDWriteDictionaryToStorageLocation(ownerIndex, mostRecentDictionary);
+    // pass back the dictionary, by reference
+    *ownerDictionary = [NSMutableDictionary dictionaryWithDictionary:mostRecentDictionary];
+    
+    // make sure our Opt-Out flag is consistent
+    if (optedOut) {
+        [*ownerDictionary setObject:[NSNumber numberWithBool:YES] forKey:SUUIDOptOutKey];
     }
     
-    // pass back the dictionary, by reference
-    if (ownerDictionary) {
-        *ownerDictionary = [NSMutableDictionary dictionaryWithDictionary:mostRecentDictionary];
-    }
+    // Make sure to write the most recent structure to the new location
+    SUUIDWriteDictionaryToStorageLocation(ownerIndex, mostRecentDictionary);
     
     return ownerIndex;
 }

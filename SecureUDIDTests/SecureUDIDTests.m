@@ -40,6 +40,7 @@
 extern NSString *const SUUIDTypeDataDictionary;
 extern NSString *const SUUIDOwnerKey;
 extern NSString *const SUUIDIdentifierKey;
+extern NSString *const SUUIDOptOutKey;
 extern NSString *const SUUIDTimeStampKey;
 extern NSString *const SUUIDModelHashKey;
 extern NSString *const SUUIDSchemaVersionKey;
@@ -50,6 +51,7 @@ extern NSString     *SUUIDPasteboardNameForNumber(NSInteger number);
 extern NSDictionary *SUUIDDictionaryForStorageLocation(NSInteger number);
 extern void          SUUIDWriteDictionaryToStorageLocation(NSInteger number, NSDictionary* dictionary);
 extern void          SUUIDDeleteStorageLocation(NSInteger number);
+extern void          SUUIDRemoveAllSecureUDIDData(void);
 
 // End of stuff
 
@@ -319,6 +321,8 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
 }
 
 - (void)testOptInWithNoData {
+    NSString* identifier;
+    
     SUUIDMarkOptedIn();
     
     for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
@@ -326,9 +330,15 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
     }
     
     STAssertFalse([SecureUDID isOptedOut], @"Should not be opted out");
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertFalse([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should not be the default");
 }
 
 - (void)testOptOutWithNoData {
+    NSString* identifier;
+    
     SUUIDMarkOptedOut();
     
     for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
@@ -336,22 +346,84 @@ extern void          SUUIDDeleteStorageLocation(NSInteger number);
     }
     
     STAssertTrue([SecureUDID isOptedOut], @"Should be opted out");
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertTrue([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should be the default");
 }
 
 - (void)testOptOutTwiceWithNoData {
+    NSString* identifier;
+    
     SUUIDMarkOptedOut();
     SUUIDMarkOptedOut();
     
     STAssertTrue([SecureUDID isOptedOut], @"Should be opted out");
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertTrue([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should be the default");
 }
 
 - (void)testOptOutTwice {
+    NSString* identifier;
+    
     [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
     
     SUUIDMarkOptedOut();
     SUUIDMarkOptedOut();
     
     STAssertTrue([SecureUDID isOptedOut], @"Should be opted out");
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertTrue([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should be the default");
+}
+
+- (void)testOptOutFollowedByDeleteShouldHaveOptOutInAllLocations {
+    NSString* identifier;
+    
+    [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    SUUIDMarkOptedOut();
+    
+    SUUIDRemoveAllSecureUDIDData();
+    
+    STAssertTrue([SecureUDID isOptedOut], @"Should be opted out");
+    
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
+        NSDictionary* dictionary;
+        
+        dictionary = SUUIDDictionaryForStorageLocation(i);
+        STAssertTrue([[dictionary objectForKey:SUUIDOptOutKey] boolValue], @"Opt-Out flag should be set");
+    }
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertTrue([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should be the default");
+}
+
+- (void)testDeleteFollowedByOptOutShouldHaveOptOutInAllLocations {
+    NSString* identifier;
+    
+    [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    SUUIDRemoveAllSecureUDIDData();
+    
+    SUUIDMarkOptedOut();
+    
+    STAssertTrue([SecureUDID isOptedOut], @"Should be opted out");
+    
+    for (NSInteger i = 0; i < SUUID_MAX_STORAGE_LOCATIONS; ++i) {
+        NSDictionary* dictionary;
+        
+        dictionary = SUUIDDictionaryForStorageLocation(i);
+        STAssertTrue([[dictionary objectForKey:SUUIDOptOutKey] boolValue], @"Opt-Out flag should be set");
+    }
+    
+    identifier = [SecureUDID UDIDForDomain:@"com.example.myapp-1" usingKey:@"example key 1"];
+    
+    STAssertTrue([identifier isEqualToString:SUUIDDefaultIdentifier], @"Identifier should be the default");
 }
 
 - (void)testNewerSchemaIsUntouched {
