@@ -245,12 +245,12 @@ NSString *SUUIDCryptorToString(CCOperation operation, NSData *value, NSData *key
 /*
  Compute a SHA1 of the input.
  */
-NSData *SUUIDHash(NSData* data) {
-    uint8_t digest[kCCKeySizeAES128] = {0};
+NSData *SUUIDHash(NSData __unsafe_unretained * data) {
+    uint8_t digest[CC_SHA1_DIGEST_LENGTH] = {0};
     
     CC_SHA1(data.bytes, data.length, digest);
     
-    return [NSData dataWithBytes:digest length:kCCKeySizeAES128];
+    return [NSData dataWithBytes:digest length:CC_SHA1_DIGEST_LENGTH];
 }
 
 NSData* SUUIDModelHash(void) {
