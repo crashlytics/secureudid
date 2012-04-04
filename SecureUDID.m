@@ -166,7 +166,7 @@ BOOL          SUUIDValidOwnerObject(id object);
     return identifier;
 }
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_4_0
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 40000
 + (void)retrieveUDIDForDomain:(NSString *)domain usingKey:(NSString *)key completion:(void (^)(NSString* identifier))completion {
     // retreive the identifier on a low-priority thread
     
