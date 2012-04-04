@@ -245,7 +245,7 @@ NSString *SUUIDCryptorToString(CCOperation operation, NSData *value, NSData *key
 /*
  Compute a SHA1 of the input.
  */
-NSData *SUUIDHash(NSData __unsafe_unretained * data) {
+NSData *SUUIDHash(NSData *data) {
     uint8_t digest[CC_SHA1_DIGEST_LENGTH] = {0};
     
     CC_SHA1(data.bytes, data.length, digest);
