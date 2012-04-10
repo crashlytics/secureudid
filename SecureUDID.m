@@ -620,21 +620,21 @@ BOOL SUUIDValidTopLevelObject(id object) {
     // - SUUIDTimeStampKey + SUUIDOwnerKey + at least one additional key that is not SUUIDOptOutKey
     // - SUUIDTimeStampKey + SUUIDOwnerKey + SUUIDOptOutKey
     
-    if ([object objectForKey:SUUIDTimeStampKey] && [object objectForKey:SUUIDOwnerKey]) {
+    if ([(NSDictionary *)object objectForKey:SUUIDTimeStampKey] && [(NSDictionary *)object objectForKey:SUUIDOwnerKey]) {
         NSMutableDictionary* ownersOnlyDictionary;
         NSData*              ownerField;
         
-        if ([object objectForKey:SUUIDOptOutKey]) {
+        if ([(NSDictionary *)object objectForKey:SUUIDOptOutKey]) {
             return YES;
         }
         
         // We have to trust future schema versions.  Note that the lack of a schema version key will
         // always fail this check, since the first schema version was 1.
-        if ([[object objectForKey:SUUIDSchemaVersionKey] intValue] > SUUID_SCHEMA_VERSION) {
+        if ([[(NSDictionary *)object objectForKey:SUUIDSchemaVersionKey] intValue] > SUUID_SCHEMA_VERSION) {
             return YES;
         }
         
-        ownerField = [object objectForKey:SUUIDOwnerKey];
+        ownerField = [(NSDictionary *)object objectForKey:SUUIDOwnerKey];
         if (![ownerField isKindOfClass:[NSData class]]) {
             return NO;
         }
@@ -666,7 +666,7 @@ BOOL SUUIDValidTopLevelObject(id object) {
     }
     
     // Maybe just the SUUIDOptOutKey, on its own
-    if ([[object objectForKey:SUUIDOptOutKey] boolValue] == YES) {
+    if ([[(NSDictionary *)object objectForKey:SUUIDOptOutKey] boolValue] == YES) {
         return YES;
     }
     
