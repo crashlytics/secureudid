@@ -221,7 +221,7 @@ NSData *SUUIDCryptorToData(CCOperation operation, NSData *value, NSData *key) {
                                           &numBytes);
     
     if (cryptStatus == kCCSuccess) {
-        return [[[NSData alloc] initWithBytes:output.bytes length:numBytes] autorelease];
+        return [NSData dataWithBytes:output.bytes length:numBytes];
     }
     
     return nil;
