@@ -15,8 +15,8 @@ SecureUDIDs have the following attributes:
 
     #import "SecureUDID.h"
 
-    NSString *domain     = @"com.example.myapp"
-    NSString *key        = @"difficult-to-guess-key"
+    NSString *domain     = @"com.example.myapp";
+    NSString *key        = @"difficult-to-guess-key";
     NSString *identifier = [SecureUDID UDIDForDomain:domain usingKey:key];
     // The returned identifier is a 36 character (128 byte + 4 dashes) string that is unique for that domain, key, and device tuple.
 
