@@ -166,7 +166,7 @@ BOOL          SUUIDValidOwnerObject(id object);
     return identifier;
 }
 
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_4_0
+#if __IPHONE_OS_VERSION_MIN_REQUIRED >= 40000
 + (void)retrieveUDIDForDomain:(NSString *)domain usingKey:(NSString *)key completion:(void (^)(NSString* identifier))completion {
     // retreive the identifier on a low-priority thread
     
@@ -221,7 +221,7 @@ NSData *SUUIDCryptorToData(CCOperation operation, NSData *value, NSData *key) {
                                           &numBytes);
     
     if (cryptStatus == kCCSuccess) {
-        return [[[NSData alloc] initWithBytes:output.bytes length:numBytes] autorelease];
+        return [NSData dataWithBytes:output.bytes length:numBytes];
     }
     
     return nil;
@@ -245,7 +245,7 @@ NSString *SUUIDCryptorToString(CCOperation operation, NSData *value, NSData *key
 /*
  Compute a SHA1 of the input.
  */
-NSData *SUUIDHash(NSData __unsafe_unretained * data) {
+NSData *SUUIDHash(NSData *data) {
     uint8_t digest[CC_SHA1_DIGEST_LENGTH] = {0};
     
     CC_SHA1(data.bytes, data.length, digest);
@@ -620,21 +620,21 @@ BOOL SUUIDValidTopLevelObject(id object) {
     // - SUUIDTimeStampKey + SUUIDOwnerKey + at least one additional key that is not SUUIDOptOutKey
     // - SUUIDTimeStampKey + SUUIDOwnerKey + SUUIDOptOutKey
     
-    if ([object objectForKey:SUUIDTimeStampKey] && [object objectForKey:SUUIDOwnerKey]) {
+    if ([(NSDictionary *)object objectForKey:SUUIDTimeStampKey] && [(NSDictionary *)object objectForKey:SUUIDOwnerKey]) {
         NSMutableDictionary* ownersOnlyDictionary;
         NSData*              ownerField;
         
-        if ([object objectForKey:SUUIDOptOutKey]) {
+        if ([(NSDictionary *)object objectForKey:SUUIDOptOutKey]) {
             return YES;
         }
         
         // We have to trust future schema versions.  Note that the lack of a schema version key will
         // always fail this check, since the first schema version was 1.
-        if ([[object objectForKey:SUUIDSchemaVersionKey] intValue] > SUUID_SCHEMA_VERSION) {
+        if ([[(NSDictionary *)object objectForKey:SUUIDSchemaVersionKey] intValue] > SUUID_SCHEMA_VERSION) {
             return YES;
         }
         
-        ownerField = [object objectForKey:SUUIDOwnerKey];
+        ownerField = [(NSDictionary *)object objectForKey:SUUIDOwnerKey];
         if (![ownerField isKindOfClass:[NSData class]]) {
             return NO;
         }
@@ -666,7 +666,7 @@ BOOL SUUIDValidTopLevelObject(id object) {
     }
     
     // Maybe just the SUUIDOptOutKey, on its own
-    if ([[object objectForKey:SUUIDOptOutKey] boolValue] == YES) {
+    if ([[(NSDictionary *)object objectForKey:SUUIDOptOutKey] boolValue] == YES) {
         return YES;
     }
     

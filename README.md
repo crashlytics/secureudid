@@ -49,6 +49,12 @@ Fork the crashlytics/secureudid project on GitHub, file issues, implement fixes,
 
 #####Version History
 
+May 1, 2012 - 1.1.1
+- Corrected use of availability macros
+- Removed an incorrect use of ARC qualifier in SUUIDHash
+- Lowered the minimum SDK target in the Xcode project to 3.1
+- Added some safer explicit casting after object deserialization
+
 March 30, 2012 - 1.1
 
 - Greatly improved robustness to backing store corruption/correctness
