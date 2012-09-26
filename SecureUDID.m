@@ -256,23 +256,17 @@ NSData *SUUIDHash(NSData *data) {
 NSData* SUUIDModelHash(void) {
     NSString* result;
     
-    result = @"Unknown";
+    result = nil;
     
     do {
         size_t size;
-        char*  value;
-        
-        value  = NULL;
         
         // first get the size
         if (sysctlbyname("hw.machine", NULL, &size, NULL, 0) != 0) {
             break;
         }
         
-        value = malloc(size);
-        if (!value) {
-            break;
-        }
+        char value[size];
         
         // now get the value
         if (sysctlbyname("hw.machine", value, &size, NULL, 0) != 0) {
@@ -281,13 +275,11 @@ NSData* SUUIDModelHash(void) {
         
         // convert the value to an NSString
         result = [NSString stringWithCString:value encoding:NSUTF8StringEncoding];
-        if (!result) {
-            break;
-        }
-        
-        // free our buffer
-        free(value);
     } while (0);
+    
+    if (!result) {
+        result = @"Unknown";
+    }
     
     return SUUIDHash([result dataUsingEncoding:NSUTF8StringEncoding]);
 }
