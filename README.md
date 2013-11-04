@@ -1,3 +1,8 @@
+## SecureUDID is Deprecated
+With the release of iOS 6, Apple made great strides towards offering a powerful, secure UDID replacement. Now that iOS 6+ makes up the vast majority of active iOS usage and in concert with Apple's official deprecation of the UDID, it is time to retire SecureUDID as well. We recommend using Apple's iOS 6 vendor and advertising identifiers instead. Check out our other [Crashlytics Labs](http://try.crashlytics.com/labs/) projects for the latest from the Crashlytics team!
+
+### For posterity...
+
 ![image](http://www.crashlytics.com/blog/wp-content/uploads/2012/03/SecureUDID.png)
 
 ####What is SecureUDID?
